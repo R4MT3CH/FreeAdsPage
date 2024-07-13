@@ -15,6 +15,7 @@ export default function Home() {
     if (!params) {
       params = new URLSearchParams();
     }
+    
     if (!params.get('center')) {
       return;
     }

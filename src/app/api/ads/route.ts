@@ -5,50 +5,52 @@ import {FilterQuery, PipelineStage} from "mongoose";
 import {getServerSession} from "next-auth";
 
 function splitCoordinates(coords: string) {
-    const parts = coords.match(/-?\d+(\.\d+)?/g);
-    if (parts && parts.length === 2) {
-        return parts.map(parseFloat);
-    }
-    throw new Error("Input string is not in the correct format");
+  const parts = coords.match(/-?\d+(\.\d+)?/g);
+  if (parts && parts.length === 2) {
+      return parts.map(parseFloat);
+  }
+  throw new Error("Input string is not in the correct format");
 }
 
 export async function GET(req: Request, res: Response) {
-
   await connect();
   const {searchParams} = new URL(req.url);
-  const filter:FilterQuery<Ad> = {};
-  const phrase = searchParams.get('phrase') || null;
+
+  const phrase = searchParams.get('phrase');
   const category = searchParams.get('category');
   const min = searchParams.get('min');
   const max = searchParams.get('max');
   const radius = searchParams.get('radius');
   const center = searchParams.get('center');
-  
+
+  const filter:FilterQuery<Ad> = {};
+  const aggregationSteps:PipelineStage[] = [];
   if (phrase) {
     filter.title = {$regex: '.*'+phrase+'.*', $options: 'i'};
   }
-
-  const aggregationSteps:PipelineStage[] = [];
-  
   if (category) {
     filter.category = category;
   }
-  if (min && !max) filter.price = {$gte: parseFloat(min)};
-  if (max && !min) filter.price = {$lte: parseFloat(max)};
-  if (min && max) filter.price = {$gte: parseFloat(min), $lte:parseFloat(max)};
-
+  if (min && !max) filter.price = {$gte: min};
+  if (max && !min) filter.price = {$lte: max};
+  if (min && max) filter.price = {$gte: min, $lte: max};
 
   if (radius && center) {
 
     const [coord1, coord2] = splitCoordinates(center);
-    // console.log(coord1, coord2);
+    const lat = coord1;
+    const lng = coord2;
+
+    console.log(lat,lng)
+
+
 
     aggregationSteps.push(
       {
         $geoNear: {
           near: {
             type: 'Point',
-            coordinates: [parseFloat(coord2),parseFloat(coord1)]
+            coordinates: [ lng, lat ]
           },
           query: filter,
           includeLocs: 'location',
@@ -60,10 +62,11 @@ export async function GET(req: Request, res: Response) {
     );
   }
 
-  aggregationSteps.push({ $match: filter }, { $sort: { createdAt: -1 } });
+  // aggregationSteps.push({
+  //   $sort: {createdAt:-1},
+  // });
 
-  // AdModel.find(filter, null, {sort:{createdAt:-1}})
-  // const adsDocs = await AdModel.find(filter, null, {sort:{createdAt:-1}})
+  aggregationSteps.push({ $match: filter }, { $sort: { createdAt: -1 } });
   const adsDocs = await AdModel.aggregate(aggregationSteps);
   return Response.json(adsDocs);
 }

@@ -30,6 +30,7 @@ export default function AdForm({
   function handleFindMyPositionClick() {
     navigator.geolocation.getCurrentPosition(ev => {
       const location = {lat: ev.coords.latitude, lng: ev.coords.longitude};
+      console.log(location);
       setLocation(location);
       setGpsCoords(location);
     }, console.error);
